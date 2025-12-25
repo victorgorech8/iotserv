@@ -20,74 +20,62 @@
 init() ->
     {ok, ConfigBin} = file:read_file("sys.config.json"),
     Config = jsx:decode(ConfigBin, [return_maps]),
-    
     IotConfig = maps:get(<<"iotserv">>, Config),
-    DetsPath = maps:get(<<"dets_path">>, IotConfig),
-    TableName = list_to_atom(maps:get(<<"table_name">>, IotConfig)),
     
-    {ok, DetsRef} = dets:open_file(TableName, [{file, DetsPath}, {type, set}]),
+    TableName = iot_devices,
     
-    EtsRef = ets:new(TableName, [set, named_table, protected, {keypos, #device.id}]),
+    DetsPathStr = binary_to_list(maps:get(<<"dets_path">>, IotConfig)),
+  
+    ensure_directory(DetsPathStr),
     
-    load_from_dets(DetsRef, EtsRef),
-    
-    dets:close(DetsRef),
-    
-    {ok, TableName}.
 
-load_from_dets(DetsRef, EtsRef) ->
-    case dets:first(DetsRef) of
-        '$end_of_table' ->
-            ok;
-        Key ->
-            load_device(DetsRef, EtsRef, Key),
-            load_rest(DetsRef, EtsRef, Key)
+    case dets:open_file(TableName, [{file, DetsPathStr}, {type, set}, {keypos, 2}]) of
+        {ok, _} ->
+            %% 5. Создаем ETS копию в памяти
+            ets:new(TableName, [set, named_table, protected, {keypos, #device.id}]),
+            load_from_dets(TableName),
+            {ok, TableName};
+        {error, Reason} ->
+            {error, Reason}
     end.
 
-load_device(DetsRef, EtsRef, Key) ->
-    case dets:lookup(DetsRef, Key) of
-        [Device] ->
-            ets:insert(EtsRef, Device);
-        [] ->
-            ok
+ensure_directory(Path) ->
+    Dirname = filename:dirname(Path),
+    case filelib:is_dir(Dirname) of
+        true -> ok;
+        false -> file:make_dir(Dirname)
     end.
 
-load_rest(DetsRef, EtsRef, PrevKey) ->
-    case dets:next(DetsRef, PrevKey) of
-        '$end_of_table' ->
-            ok;
-        NextKey ->
-            load_device(DetsRef, EtsRef, NextKey),
-            load_rest(DetsRef, EtsRef, NextKey)
-    end.
+load_from_dets(TableName) ->
+    
+    dets:traverse(TableName, fun({_Key, Device}) ->
+        ets:insert(TableName, Device),
+        continue
+    end).
 
 add_device(Device) ->
-    TableName = get_table_name(),
-    DetsPath = get_dets_path(),
+    TableName = iot_devices,
     
+
     ets:insert(TableName, Device),
 
-    {ok, DetsRef} = dets:open_file(TableName, [{file, DetsPath}]),
-    dets:insert(DetsRef, Device),
-    dets:close(DetsRef),
+    dets:insert(TableName, Device),
     
     ok.
 
 delete_device(Id) ->
-    TableName = get_table_name(),
-    DetsPath = get_dets_path(),
+    TableName = iot_devices,
     
+
     ets:delete(TableName, Id),
     
-    {ok, DetsRef} = dets:open_file(TableName, [{file, DetsPath}]),
-    dets:delete(DetsRef, Id),
-    dets:close(DetsRef),
+
+    dets:delete(TableName, Id),
     
     ok.
 
 update_device(Id, Updates) ->
-    TableName = get_table_name(),
-    DetsPath = get_dets_path(),
+    TableName = iot_devices,
     
     case ets:lookup(TableName, Id) of
         [Device] ->
@@ -95,9 +83,7 @@ update_device(Id, Updates) ->
             
             ets:insert(TableName, UpdatedDevice),
             
-            {ok, DetsRef} = dets:open_file(TableName, [{file, DetsPath}]),
-            dets:insert(DetsRef, UpdatedDevice),
-            dets:close(DetsRef),
+            dets:insert(TableName, UpdatedDevice),
             
             {ok, UpdatedDevice};
         [] ->
@@ -105,7 +91,7 @@ update_device(Id, Updates) ->
     end.
 
 lookup(Id) ->
-    TableName = get_table_name(),
+    TableName = iot_devices,
     case ets:lookup(TableName, Id) of
         [Device] ->
             {ok, Device};
@@ -114,24 +100,20 @@ lookup(Id) ->
     end.
 
 get_all() ->
-    TableName = get_table_name(),
+    TableName = iot_devices,
     ets:tab2list(TableName).
 
 stop() ->
-    TableName = get_table_name(),
+    TableName = iot_devices,
+    dets:close(TableName),
+
     ets:delete(TableName),
     ok.
-
-get_table_name() ->
-    iot_devices.
-
-get_dets_path() ->
-    "data/devices.dets".
 
 apply_updates(Device, Updates) ->
     lists:foldl(fun({Field, Value}, Acc) ->
         set_field(Acc, Field, Value)
-    end, Device, Updates).
+    end, Device, maps:to_list(Updates)).
 
 set_field(Device, name, Value) ->
     Device#device{name = Value};

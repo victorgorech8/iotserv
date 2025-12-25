@@ -1,0 +1,12 @@
+{application,iotserv,
+             [{description,[79,84,80,45,1087,1088,1080,1083,1086,1078,1077,
+                            1085,1080,1077,32,1076,1083,1103,32,1091,1087,
+                            1088,1074,1072,1083,1077,1085,1080,1103,32,1089,
+                            1077,1088,1074,1077,1088,1086,1084,32,73,111,84,
+                            45,1091,1089,1090,1088,1086,1081,1089,1090,1074]},
+              {vsn,"1.0.0"},
+              {registered,[iotserv,iotserv_sup]},
+              {applications,[kernel,stdlib,jsx]},
+              {mod,{iotserv_app,[]}},
+              {env,[]},
+              {modules,[iotserv,iotserv_app,iotserv_db,iotserv_sup]}]}.
