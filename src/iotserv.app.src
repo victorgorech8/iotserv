@@ -1,0 +1,8 @@
+{application, iotserv,
+ [{description, "OTP-приложение для упрваления сервером IoT-устройств"},
+  {vsn, "1.0.0"},
+  {registered, [iotserv, iotserv_sup]},
+  {applications, [kernel, stdlib, jsx]},
+  {mod, {iotserv_app, []}},
+  {env, []}
+ ]}.

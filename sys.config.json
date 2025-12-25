@@ -1,0 +1,6 @@
+{
+    "iotserv": {
+      "dets_path": "data/devices.dets",
+      "table_name": "iot_devices"
+    }
+  }
